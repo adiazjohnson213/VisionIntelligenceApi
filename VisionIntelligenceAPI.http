@@ -1,0 +1,6 @@
+@VisionIntelligenceAPI_HostAddress = http://localhost:5123
+
+GET {{VisionIntelligenceAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
