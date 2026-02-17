@@ -1,10 +1,31 @@
+using System.Text.Json.Serialization;
+using Azure;
+using Azure.AI.Vision.ImageAnalysis;
+using Microsoft.Extensions.Options;
+using VisionIntelligenceAPI.Commons;
 using VisionIntelligenceAPI.Observability;
+using VisionIntelligenceAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+//Bind configuration settings
+builder.Services.Configure<VisionOptions>(
+    builder.Configuration.GetSection("Vision"));
 
-builder.Services.AddControllers();
+// Add services to the container.
+builder.Services.AddSingleton(sp =>
+{
+    var opt = sp.GetRequiredService<IOptions<VisionOptions>>().Value;
+    return new ImageAnalysisClient(new Uri(opt.Endpoint), new AzureKeyCredential(opt.ApiKey));
+});
+builder.Services.AddScoped<VisionAnalysisService>();
+
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
