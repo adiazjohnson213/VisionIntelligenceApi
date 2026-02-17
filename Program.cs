@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Azure;
 using Azure.AI.Vision.ImageAnalysis;
 using Microsoft.Extensions.Options;
+using VisionIntelligenceAPI.Clients;
 using VisionIntelligenceAPI.Commons;
 using VisionIntelligenceAPI.Observability;
 using VisionIntelligenceAPI.Services;
@@ -9,8 +10,15 @@ using VisionIntelligenceAPI.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 //Bind configuration settings
-builder.Services.Configure<VisionOptions>(
-    builder.Configuration.GetSection("Vision"));
+builder.Services.AddOptions<VisionOptions>()
+    .Bind(builder.Configuration.GetSection("Vision"))
+    .ValidateDataAnnotations()
+    .Validate(o => Uri.TryCreate(o.Endpoint, UriKind.Absolute, out _), "Vision:Endpoint must be an absolute URI.")
+    .ValidateOnStart();
+
+builder.Services.AddSingleton(serviceProvider => serviceProvider.GetRequiredService<IOptions<VisionOptions>>().Value);
+
+builder.Services.AddHttpClient<VisionRestClient>();
 
 // Add services to the container.
 builder.Services.AddSingleton(sp =>
