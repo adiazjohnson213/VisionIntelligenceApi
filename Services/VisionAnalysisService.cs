@@ -1,5 +1,6 @@
 ﻿using Azure.AI.Vision.ImageAnalysis;
 using VisionIntelligenceAPI.Clients;
+using VisionIntelligenceAPI.Mappers;
 using VisionIntelligenceAPI.Models.Dtos.Requests;
 using VisionIntelligenceAPI.Models.Dtos.Responses;
 using VisionIntelligenceAPI.Models.Enums;
@@ -19,7 +20,7 @@ namespace VisionIntelligenceAPI.Services
         public async Task<VisionAnalyzeResponseDto> AnalyzeUrlWithSdkAsync(
             string correlationId, AnalyzeUrlRequestDto request, CancellationToken cancellationToken)
         {
-            var features = MapToVisualFeatures(request.Requirements);
+            var features = FeatureMapper.ToVisualFeatures(request.Requirements);
 
             var result = await _client.AnalyzeAsync(
                 new Uri(request.Url), features, new ImageAnalysisOptions(), cancellationToken);
@@ -56,7 +57,7 @@ namespace VisionIntelligenceAPI.Services
             if (!AllowedContentTypes.Contains(file.ContentType))
                 throw new ArgumentException($"Unsupported content-type: {file.ContentType}");
 
-            var features = MapToVisualFeatures(requirements);
+            var features = FeatureMapper.ToVisualFeatures(requirements);
 
             await using var stream = file.OpenReadStream();
             var imageData = await BinaryData.FromStreamAsync(stream, cancellationToken);
@@ -87,7 +88,7 @@ namespace VisionIntelligenceAPI.Services
         AnalyzeUrlRequestDto request,
         CancellationToken ct)
         {
-            var featuresCsv = MapToFeaturesCsv(request.Requirements);
+            var featuresCsv = FeatureMapper.ToRestFeaturesCsv(request.Requirements);
             using var json = await _rest.AnalyzeUrlAsync(featuresCsv, request.Url, ct);
 
             // Parsing defensivo: cada bloque puede NO venir si no lo pediste
@@ -133,41 +134,6 @@ namespace VisionIntelligenceAPI.Services
                 Read: read,
                 Objects: objects
             );
-        }
-
-        private VisualFeatures MapToVisualFeatures(Requirement[] requirements)
-        {
-            VisualFeatures visualFeatures = 0;
-
-            foreach (var requirement in requirements)
-            {
-                visualFeatures |= requirement switch
-                {
-                    Requirement.Caption => VisualFeatures.Caption,
-                    Requirement.Read => VisualFeatures.Read,
-                    Requirement.Objects => VisualFeatures.Objects,
-                    _ => 0
-                };
-
-            }
-
-            return visualFeatures;
-        }
-
-        private static string MapToFeaturesCsv(Requirement[] requirements)
-        {
-            var tokens = new List<string>(requirements.Length);
-            foreach (var r in requirements)
-            {
-                tokens.Add(r switch
-                {
-                    Requirement.Caption => "caption",
-                    Requirement.Read => "read",
-                    Requirement.Objects => "objects",
-                    _ => ""
-                });
-            }
-            return string.Join(",", tokens.Where(t => !string.IsNullOrWhiteSpace(t)));
         }
     }
 }

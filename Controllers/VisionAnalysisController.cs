@@ -20,6 +20,9 @@ namespace VisionIntelligenceAPI.Controllers
             var correlationId = HttpContext.Items[CorrelationIdMiddleware.HeaderName]?.ToString()
                                 ?? HttpContext.TraceIdentifier;
 
+            if (request.Requirements == null || request.Requirements.Length == 0)
+                return BadRequest(new ApiErrorDto("InvalidRequest", "Requirements must contain at least one item.", correlationId));
+
             var engine = request.Engine ?? EngineMode.Sdk;
 
             var response = engine switch
@@ -42,6 +45,9 @@ namespace VisionIntelligenceAPI.Controllers
 
             if (!string.IsNullOrWhiteSpace(engine) && !engine.Equals("Sdk", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new ApiErrorDto("InvalidRequest", "This step supports only Engine=Sdk.", correlationId));
+
+            if (!string.IsNullOrWhiteSpace(requirements))
+                return BadRequest(new ApiErrorDto("InvalidRequest", "Requirements must contain at least one item.", correlationId));
 
             Requirement[] reqs;
             try
