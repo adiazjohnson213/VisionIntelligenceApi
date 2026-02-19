@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using VisionIntelligenceAPI.Clients;
 using VisionIntelligenceAPI.Commons;
 using VisionIntelligenceAPI.Observability;
+using VisionIntelligenceAPI.Resilience;
 using VisionIntelligenceAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,6 +40,7 @@ builder.Services.AddSingleton(sp =>
     var opt = sp.GetRequiredService<IOptions<VisionOptions>>().Value;
     return new ImageAnalysisClient(new Uri(opt.Endpoint), new AzureKeyCredential(opt.ApiKey), clientOptions);
 });
+builder.Services.AddSingleton(new ConcurrencyLimiter(maxConcurrency: 4));
 builder.Services.AddScoped<VisionAnalysisService>();
 
 builder.Services

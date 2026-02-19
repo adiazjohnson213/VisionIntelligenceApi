@@ -4,10 +4,11 @@ using VisionIntelligenceAPI.Mappers;
 using VisionIntelligenceAPI.Models.Dtos.Requests;
 using VisionIntelligenceAPI.Models.Dtos.Responses;
 using VisionIntelligenceAPI.Models.Enums;
+using VisionIntelligenceAPI.Resilience;
 
 namespace VisionIntelligenceAPI.Services
 {
-    public class VisionAnalysisService(ImageAnalysisClient _client, VisionRestClient _rest)
+    public class VisionAnalysisService(ImageAnalysisClient _client, VisionRestClient _rest, ConcurrencyLimiter _limiter)
     {
         private const long MaxFileSizeBytes = 20L * 1024 * 1024;
         private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -22,8 +23,9 @@ namespace VisionIntelligenceAPI.Services
         {
             var features = FeatureMapper.ToVisualFeatures(request.Requirements);
 
-            var result = await _client.AnalyzeAsync(
-                new Uri(request.Url), features, new ImageAnalysisOptions(), cancellationToken);
+            var result = await _limiter.ExecuteAsync(
+                async cancellationToken2 => await _client.AnalyzeAsync(new Uri(request.Url), features, new ImageAnalysisOptions(), cancellationToken2),
+                cancellationToken);
 
 
             return new VisionAnalyzeResponseDto(
@@ -51,7 +53,9 @@ namespace VisionIntelligenceAPI.Services
             await using var stream = file.OpenReadStream();
             var imageData = await BinaryData.FromStreamAsync(stream, cancellationToken);
 
-            var result = await _client.AnalyzeAsync(imageData, features, new ImageAnalysisOptions(), cancellationToken);
+            var result = await _limiter.ExecuteAsync(
+                async cancellationToken2 => await _client.AnalyzeAsync(imageData, features, new ImageAnalysisOptions(), cancellationToken2),
+                cancellationToken);
 
             return new VisionAnalyzeResponseDto(
                             CorrelationId: correlationId,
@@ -64,10 +68,12 @@ namespace VisionIntelligenceAPI.Services
         public async Task<VisionAnalyzeResponseDto> AnalyzeUrlWithRestAsync(
         string correlationId,
         AnalyzeUrlRequestDto request,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
         {
             var featuresCsv = FeatureMapper.ToRestFeaturesCsv(request.Requirements);
-            using var json = await _rest.AnalyzeUrlAsync(featuresCsv, request.Url, ct);
+            using var json = await _limiter.ExecuteAsync(
+                async cancellationToken2 => await _rest.AnalyzeUrlAsync(featuresCsv, request.Url, cancellationToken2),
+                cancellationToken);
 
             var root = json.RootElement;
 
