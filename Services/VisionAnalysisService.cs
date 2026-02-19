@@ -9,7 +9,7 @@ namespace VisionIntelligenceAPI.Services
 {
     public class VisionAnalysisService(ImageAnalysisClient _client, VisionRestClient _rest)
     {
-        private const long MaxFileSizeBytes = 20L * 1024 * 1024; // 20 MB (límite común para Image Analysis 4.0)
+        private const long MaxFileSizeBytes = 20L * 1024 * 1024;
         private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
         {
             "image/jpeg",
@@ -25,23 +25,12 @@ namespace VisionIntelligenceAPI.Services
             var result = await _client.AnalyzeAsync(
                 new Uri(request.Url), features, new ImageAnalysisOptions(), cancellationToken);
 
-            var captionDto = (request.Requirements.Contains(Requirement.Caption) && result.Value.Caption is not null)
-                                    ? new CaptionDto(result.Value.Caption.Text, result.Value.Caption.Confidence)
-                                    : null;
-
-            var readDto = request.Requirements.Contains(Requirement.Read)
-                            ? new List<ReadLineDto>()
-                            : null;
-
-            var objectsDto = request.Requirements.Contains(Requirement.Objects)
-                                ? new List<ObjectDto>()
-                                : null;
 
             return new VisionAnalyzeResponseDto(
                             CorrelationId: correlationId,
-                            Caption: captionDto,
-                            Read: readDto,
-                            Objects: objectsDto
+                            Caption: VisionResultMapper.MapCaptionSdk(result.Value, request.Requirements),
+                            Read: VisionResultMapper.MapReadSdk(result.Value, request.Requirements),
+                            Objects: VisionResultMapper.MapObjectsSdk(result.Value, request.Requirements)
                         );
         }
 
@@ -64,22 +53,11 @@ namespace VisionIntelligenceAPI.Services
 
             var result = await _client.AnalyzeAsync(imageData, features, new ImageAnalysisOptions(), cancellationToken);
 
-            var captionDto = (requirements.Contains(Requirement.Caption) && result.Value.Caption is not null)
-                         ? new CaptionDto(result.Value.Caption.Text, result.Value.Caption.Confidence)
-                         : null;
-
-            var readDto = requirements.Contains(Requirement.Read)
-                          ? new List<ReadLineDto>()
-                          : null;
-            var objectsDto = requirements.Contains(Requirement.Objects)
-                         ? new List<ObjectDto>()
-                         : null;
-
             return new VisionAnalyzeResponseDto(
                             CorrelationId: correlationId,
-                            Caption: captionDto,
-                            Read: readDto,
-                            Objects: objectsDto
+                            Caption: VisionResultMapper.MapCaptionSdk(result.Value, requirements),
+                            Read: VisionResultMapper.MapReadSdk(result.Value, requirements),
+                            Objects: VisionResultMapper.MapObjectsSdk(result.Value, requirements)
                         );
         }
 
@@ -91,48 +69,13 @@ namespace VisionIntelligenceAPI.Services
             var featuresCsv = FeatureMapper.ToRestFeaturesCsv(request.Requirements);
             using var json = await _rest.AnalyzeUrlAsync(featuresCsv, request.Url, ct);
 
-            // Parsing defensivo: cada bloque puede NO venir si no lo pediste
-            CaptionDto? caption = null;
-            IReadOnlyList<ReadLineDto>? read = null;
-            IReadOnlyList<ObjectDto>? objects = null;
-
             var root = json.RootElement;
-
-            // Caption
-            if (request.Requirements.Contains(Requirement.Caption))
-            {
-                // si el feature fue solicitado pero falta el bloque, devolvemos null? NO: solicitado => debe existir,
-                // PERO para robustez mantenemos: si falta => caption null (y tú lo detectas en tests)
-                if (root.TryGetProperty("captionResult", out var captionResult)
-                    && captionResult.TryGetProperty("text", out var textEl)
-                    && captionResult.TryGetProperty("confidence", out var confEl))
-                {
-                    caption = new CaptionDto(textEl.GetString() ?? "", confEl.GetDouble());
-                }
-                else
-                {
-                    // solicitado pero no vino -> lo dejamos null (defensive)
-                    caption = null;
-                }
-            }
-
-            // Read (en este paso dejamos mapeo a [] si solicitado; el mapeo completo lo haces en Paso 6)
-            if (request.Requirements.Contains(Requirement.Read))
-            {
-                read = new List<ReadLineDto>(); // placeholder correcto según contrato (solicitado => [] si sin hallazgos)
-            }
-
-            // Objects (igual que Read por ahora)
-            if (request.Requirements.Contains(Requirement.Objects))
-            {
-                objects = new List<ObjectDto>();
-            }
 
             return new VisionAnalyzeResponseDto(
                 CorrelationId: correlationId,
-                Caption: caption,
-                Read: read,
-                Objects: objects
+                Caption: VisionResultMapper.MapCaptionRest(root, request.Requirements),
+                Read: VisionResultMapper.MapReadRest(root, request.Requirements),
+                Objects: VisionResultMapper.MapObjectsRest(root, request.Requirements)
             );
         }
     }

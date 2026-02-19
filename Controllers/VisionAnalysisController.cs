@@ -46,7 +46,7 @@ namespace VisionIntelligenceAPI.Controllers
             if (!string.IsNullOrWhiteSpace(engine) && !engine.Equals("Sdk", StringComparison.OrdinalIgnoreCase))
                 return BadRequest(new ApiErrorDto("InvalidRequest", "This step supports only Engine=Sdk.", correlationId));
 
-            if (!string.IsNullOrWhiteSpace(requirements))
+            if (string.IsNullOrWhiteSpace(requirements))
                 return BadRequest(new ApiErrorDto("InvalidRequest", "Requirements must contain at least one item.", correlationId));
 
             Requirement[] reqs;
