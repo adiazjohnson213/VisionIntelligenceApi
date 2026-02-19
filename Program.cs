@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Azure;
 using Azure.AI.Vision.ImageAnalysis;
+using Azure.Core;
 using Microsoft.Extensions.Options;
 using VisionIntelligenceAPI.Clients;
 using VisionIntelligenceAPI.Commons;
@@ -20,11 +21,23 @@ builder.Services.AddSingleton(serviceProvider => serviceProvider.GetRequiredServ
 
 builder.Services.AddHttpClient<VisionRestClient>();
 
+
+var clientOptions = new ImageAnalysisClientOptions()
+{
+    Retry =
+    {
+        MaxRetries = 5,
+        Mode = RetryMode.Exponential,
+        Delay = TimeSpan.FromSeconds(0.8),
+        MaxDelay = TimeSpan.FromSeconds(8)
+    }
+};
+
 // Add services to the container.
 builder.Services.AddSingleton(sp =>
 {
     var opt = sp.GetRequiredService<IOptions<VisionOptions>>().Value;
-    return new ImageAnalysisClient(new Uri(opt.Endpoint), new AzureKeyCredential(opt.ApiKey));
+    return new ImageAnalysisClient(new Uri(opt.Endpoint), new AzureKeyCredential(opt.ApiKey), clientOptions);
 });
 builder.Services.AddScoped<VisionAnalysisService>();
 
