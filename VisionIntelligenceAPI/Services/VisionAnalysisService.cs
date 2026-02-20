@@ -18,7 +18,7 @@ namespace VisionIntelligenceAPI.Services
             "image/webp"
         };
 
-        public async Task<VisionAnalyzeResponseDto> AnalyzeUrlWithSdkAsync(
+        public virtual async Task<VisionAnalyzeResponseDto> AnalyzeUrlWithSdkAsync(
             string correlationId, AnalyzeUrlRequestDto request, CancellationToken cancellationToken)
         {
             var features = FeatureMapper.ToVisualFeatures(request.Requirements);

@@ -3,6 +3,8 @@ using Azure;
 using Azure.AI.Vision.ImageAnalysis;
 using Azure.Core;
 using Microsoft.Extensions.Options;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using VisionIntelligenceAPI.Clients;
 using VisionIntelligenceAPI.Commons;
 using VisionIntelligenceAPI.Observability;
@@ -17,6 +19,24 @@ builder.Services.AddOptions<VisionOptions>()
     .ValidateDataAnnotations()
     .Validate(o => Uri.TryCreate(o.Endpoint, UriKind.Absolute, out _), "Vision:Endpoint must be an absolute URI.")
     .ValidateOnStart();
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSource(VisionTelemetry.ServiceName)
+            .AddConsoleExporter();
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddMeter(VisionTelemetry.ServiceName)
+            .AddConsoleExporter();
+    });
 
 builder.Services.AddSingleton(serviceProvider => serviceProvider.GetRequiredService<IOptions<VisionOptions>>().Value);
 
@@ -73,3 +93,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }
